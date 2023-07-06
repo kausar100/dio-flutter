@@ -23,7 +23,8 @@ class MyApp extends StatelessWidget {
 }
 
 class GetSingleBook extends StatefulWidget {
-  const GetSingleBook({super.key});
+  GetSingleBook({super.key, required this.bookId});
+  String bookId;
 
   @override
   State<GetSingleBook> createState() => _GetSingleBookState();
@@ -40,11 +41,13 @@ class _GetSingleBookState extends State<GetSingleBook> {
       ),
       body: Center(
         child: FutureBuilder<Data?>(
-          future: _client.getBook(id: '1'),
+          future: _client.getBook(id: widget.bookId),
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               Data? bookInfo = snapshot.data;
-              if (bookInfo != null) {
+              if (bookInfo?.id == null) {
+                return const Text("Book not found!", textScaleFactor: 1.5);
+              } else if (bookInfo != null) {
                 return Container(
                   width: MediaQuery.of(context).size.width * 0.7,
                   decoration: BoxDecoration(
@@ -180,6 +183,13 @@ class _CreateBookState extends State<CreateBook> {
                       result = "Please fill up all the fields!";
                       showMessage(result!);
                     }
+                    // ignore: use_build_context_synchronously
+                    Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const GetBooks(),
+                        ),
+                        (route) => false);
                   },
                   child: const Text("Create Book"))
             ],
@@ -211,6 +221,7 @@ class GetBooks extends StatefulWidget {
 
 class _GetBooksState extends State<GetBooks> {
   final _client = DioClient();
+  final searchController = TextEditingController();
 
   Future<Book?> getBookList() async {
     return await _client.getBooks();
@@ -221,80 +232,141 @@ class _GetBooksState extends State<GetBooks> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Book List'),
+        centerTitle: true,
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CreateBook(),
+              ));
+        },
+        child: const Icon(Icons.add),
       ),
       body: Center(
-        child: FutureBuilder<Book?>(
-          future: getBookList(),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              Book? bookInfo = snapshot.data;
-              if (bookInfo != null) {
-                return ListView.builder(
-                  itemCount: bookInfo.books?.length,
-                  itemBuilder: (context, index) {
-                    Data? book = bookInfo.books?.elementAt(index);
-                    return book == null
-                        ? const CircularProgressIndicator()
-                        : GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        UpdateBook(book: book),
-                                  ));
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Container(
-                                width: MediaQuery.of(context).size.width * 0.7,
-                                decoration: BoxDecoration(
-                                    color: Colors.orange,
-                                    shape: BoxShape.rectangle,
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    child: Text(book.id.toString()),
-                                  ),
-                                  title: Text(
-                                    book.title.toString(),
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Text(book.releaseDate.toString()),
-                                  trailing: Column(
-                                    children: [
-                                      Text(book.pages.toString()),
-                                      const Spacer(),
-                                      InkWell(
-                                          onTap: () async {
-                                            String message =
-                                                await _client.deleteBook(
-                                                    title:
-                                                        book.title.toString());
-
-                                            showMessage(message);
-                                            setState(() {
-                                              
-                                            });
-
-                                          },
-                                          child: const Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
-                                          ))
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: TextField(
+                  textInputAction: TextInputAction.done,
+                  keyboardType: TextInputType.number,
+                  onEditingComplete: () {
+                    FocusScope.of(context).unfocus();
+                    var id = searchController.text;
+                    if (id.isEmpty) {
+                      showMessage("Please Enter an id");
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                GetSingleBook(bookId: id.toString())),
+                      );
+                    }
+                    searchController.value = TextEditingValue.empty;
                   },
-                );
-              }
-            }
-            return const CircularProgressIndicator();
-          },
+                  controller: searchController,
+                  onChanged: (value) {
+                    searchController.value = TextEditingValue(
+                        text: value,
+                        selection:
+                            TextSelection.collapsed(offset: value.length));
+                  },
+                  decoration: const InputDecoration(
+                      hintText: "Search book by id",
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.all(Radius.circular(8.0)))),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Center(
+                  child: FutureBuilder<Book?>(
+                    future: getBookList(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        Book? bookInfo = snapshot.data;
+                        if (bookInfo != null) {
+                          return ListView.builder(
+                            itemCount: bookInfo.books?.length,
+                            itemBuilder: (context, index) {
+                              Data? book = bookInfo.books?.elementAt(index);
+                              return book == null
+                                  ? const CircularProgressIndicator()
+                                  : GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  UpdateBook(book: book),
+                                            ));
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Container(
+                                          width: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.7,
+                                          decoration: BoxDecoration(
+                                              color: Colors.orange,
+                                              shape: BoxShape.rectangle,
+                                              borderRadius:
+                                                  BorderRadius.circular(8)),
+                                          child: ListTile(
+                                            leading: CircleAvatar(
+                                              child: Text(book.id.toString()),
+                                            ),
+                                            title: Text(
+                                              book.title.toString(),
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                            subtitle: Text(
+                                                book.releaseDate.toString()),
+                                            trailing: Column(
+                                              children: [
+                                                Text(book.pages.toString()),
+                                                const Spacer(),
+                                                InkWell(
+                                                    onTap: () async {
+                                                      String message =
+                                                          await _client.deleteBook(
+                                                              title: book.title
+                                                                  .toString());
+
+                                                      showMessage(message);
+                                                      setState(() {});
+                                                    },
+                                                    child: const Icon(
+                                                      Icons.delete,
+                                                      color: Colors.red,
+                                                    ))
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                            },
+                          );
+                        }
+                      }
+                      return const CircularProgressIndicator();
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -367,6 +439,7 @@ class _UpdateBookState extends State<UpdateBook> {
               TextField(
                 readOnly: true,
                 enabled: false,
+                style: const TextStyle(color: Colors.grey),
                 decoration: const InputDecoration(hintText: "Enter id"),
                 textInputAction: TextInputAction.next,
                 controller: id,
@@ -381,6 +454,7 @@ class _UpdateBookState extends State<UpdateBook> {
                 },
               ),
               TextField(
+                style: const TextStyle(color: Colors.grey),
                 readOnly: true,
                 enabled: false,
                 textInputAction: TextInputAction.next,
@@ -413,6 +487,7 @@ class _UpdateBookState extends State<UpdateBook> {
                 },
               ),
               TextField(
+                style: const TextStyle(color: Colors.grey),
                 readOnly: true,
                 enabled: false,
                 textInputAction: TextInputAction.done,
@@ -441,16 +516,17 @@ class _UpdateBookState extends State<UpdateBook> {
 
                       result = await _client.updateBook(book: book);
                       showMessage(result!);
+                      // ignore: use_build_context_synchronously
+                      Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const GetBooks(),
+                          ),
+                          (route) => false);
                     } else {
                       result = "Please checkout the release date fields!";
                       showMessage(result!);
                     }
-                    // ignore: use_build_context_synchronously
-                    Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const GetBooks(),
-                        ),(route) => false);
                   },
                   child: const Text("Update Book"))
             ],
