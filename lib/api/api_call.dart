@@ -1,13 +1,14 @@
 import 'package:dio/dio.dart';
+import 'package:dio_with_pythonanywhere/api/k_interceptor.dart';
 import 'package:dio_with_pythonanywhere/model/book.dart';
 
 class DioClient {
-  static final _baseUrl = "http://kausar100.pythonanywhere.com";
+  static const _baseUrl = "http://kausar100.pythonanywhere.com";
   final _dio = Dio(BaseOptions(
     baseUrl: _baseUrl,
     // connectTimeout: const Duration(seconds: 5),
     // receiveTimeout: const Duration(seconds: 3),
-  ));
+  ))..interceptors.add(Status());
 
   Future<Data?> getBook({required String id}) async {
     Data? book;
